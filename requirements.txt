@@ -1,0 +1,4 @@
+numpy==2.2.1
+opencv-python==4.10.0.84
+pytsk3==20231007
+pywin32==308
