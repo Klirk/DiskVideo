@@ -20,21 +20,10 @@ def scan_partition_for_video(drive, partition_offset, partition_size, buffer_siz
 
         offset = 0
         max_offset = partition_size
-        iterations = 0
-        max_iterations = 10 ** 6  # Ограничение количества итераций
 
         while offset < max_offset:
-            iterations += 1
-            if iterations > max_iterations:
-                print("Превышено максимальное количество итераций.")
-                break
-
             # Чтение данных из текущего раздела
             data = win32file.ReadFile(handle, buffer_size)[1]
-
-            # Проверка конца данных
-            if not data or len(data) < buffer_size:
-                break
 
             # Поиск имен видеофайлов (на основе вашего паттерна)
             video_files = re.findall(rb'\d{2}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}\[R\]\[\@\d+\]\[\d+\]\.h264', data)
