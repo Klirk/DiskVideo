@@ -1,5 +1,4 @@
 import subprocess
-
 import win32file
 import re
 
@@ -24,7 +23,7 @@ class DiskScanner:
                     usb_disks.append((disk_number, friendly_name, size))
         except Exception as e:
             print(f"Ошибка при выполнении команды: {e}")
-            return []
+            return
 
         if not usb_disks:
             print("USB-диски не найдены.")
@@ -39,9 +38,6 @@ class DiskScanner:
         return drive_path
 
     def scan_raw_disk_structure(self, drive):
-        import win32file
-        import re
-
         structure = {}
         try:
             handle = win32file.CreateFile(
@@ -52,10 +48,16 @@ class DiskScanner:
             current_directory = "idea0"
             structure[current_directory] = {}
 
-            # Указатель чтения данных
             offset = 0
+            max_iterations = 10 ** 6  # Ограничение по количеству итераций
+            iterations = 0
 
             while True:
+                iterations += 1
+                if iterations > max_iterations:
+                    print("Превышено максимальное количество итераций.")
+                    break
+
                 # Чтение данных с позиции offset
                 win32file.SetFilePointer(handle, offset, win32file.FILE_BEGIN)
                 data = win32file.ReadFile(handle, buffer_size)[1]
@@ -71,7 +73,6 @@ class DiskScanner:
                     if date_folder not in structure[current_directory]:
                         structure[current_directory][date_folder] = {}
 
-                if date_match:
                     for file in file_match:
                         file_name = file.decode('utf-8')
                         structure[current_directory][date_folder][file_name] = "h264"
