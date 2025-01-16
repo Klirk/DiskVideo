@@ -2,6 +2,7 @@ import subprocess
 import win32file
 import re
 
+
 class DiskScanner:
     def get_last_physical_drive(self):
         """Получает список дисков, подключенных через USB, с помощью PowerShell."""
@@ -34,7 +35,7 @@ class DiskScanner:
             print(f"Номер: {disk[0]}, Имя: {disk[1]}, Размер: {disk[2]}")
 
         disk_number = usb_disks[1][0]  # Выбираем первый USB-диск
-        drive_path = f"\\\\.\\PhysicalDrive{disk_number}" # Укажите актуальный диск
+        drive_path = f"\\\\.\\PhysicalDrive{disk_number}"  # Укажите актуальный диск
         return drive_path
 
     def scan_raw_disk_structure(self, drive):
@@ -44,12 +45,12 @@ class DiskScanner:
                 drive, win32file.GENERIC_READ, win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
                 None, win32file.OPEN_EXISTING, 0, None
             )
-            buffer_size = 4096  # Размер буфера чтения
+            buffer_size = 4096
             current_directory = "idea0"
             structure[current_directory] = {}
 
             offset = 0
-            max_iterations = 10 ** 6  # Ограничение по количеству итераций
+            max_iterations = 10 ** 6
             iterations = 0
 
             while True:
@@ -58,11 +59,11 @@ class DiskScanner:
                     print("Превышено максимальное количество итераций.")
                     break
 
-                # Чтение данных с позиции offset
+
                 win32file.SetFilePointer(handle, offset, win32file.FILE_BEGIN)
                 data = win32file.ReadFile(handle, buffer_size)[1]
 
-                if not data or len(data) < buffer_size:  # Проверка на конец файла
+                if not data or len(data) < buffer_size:
                     break
 
                 date_match = re.search(rb'\d{4}-\d{2}-\d{2}', data)
@@ -77,7 +78,7 @@ class DiskScanner:
                         file_name = file.decode('utf-8')
                         structure[current_directory][date_folder][file_name] = "h264"
 
-                # Увеличиваем offset для чтения следующего блока данных
+
                 offset += buffer_size
 
             win32file.CloseHandle(handle)
