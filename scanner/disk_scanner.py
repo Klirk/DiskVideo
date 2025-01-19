@@ -1,53 +1,43 @@
 import subprocess
 import win32file
 import re
-
+import os
 
 class DiskScanner:
     def get_last_physical_drive(self):
-        """Получает список дисков, подключенных через USB, с помощью PowerShell."""
+        """Получить последний подключенный USB-диск."""
         try:
             command = (
                 'powershell "Get-Disk | '
                 'Where-Object { $_.BusType -eq \'USB\' } | '
-                'Select-Object -Property Number,FriendlyName,Size | Format-Table -AutoSize"'
+                'Sort-Object -Property Number -Descending | '
+                'Select-Object -First 1 -ExpandProperty Number"'
             )
             result = subprocess.run(command, capture_output=True, text=True, shell=True)
+            disk_number = result.stdout.strip()
 
-            usb_disks = []
-            for line in result.stdout.splitlines()[2:]:  # Пропускаем заголовки таблицы
-                parts = line.strip().split()
-                if len(parts) >= 3:
-                    disk_number = parts[0]
-                    friendly_name = " ".join(parts[1:-1])
-                    size = parts[-1]
-                    usb_disks.append((disk_number, friendly_name, size))
+            if not disk_number:
+                print("USB-диски не найдены.")
+                return None
+
+            return f"\\\\.\\PhysicalDrive{disk_number}"
         except Exception as e:
-            print(f"Ошибка при выполнении команды: {e}")
-            return
+            print(f"Ошибка при определении последнего USB-диска: {e}")
+            return None
 
-        if not usb_disks:
-            print("USB-диски не найдены.")
-            return
-
-        print("Найденные USB-диски:")
-        for disk in usb_disks:
-            print(f"Номер: {disk[0]}, Имя: {disk[1]}, Размер: {disk[2]}")
-
-        disk_number = usb_disks[1][0]  # Выбираем первый USB-диск
-        drive_path = f"\\\\.\\PhysicalDrive{disk_number}"  # Укажите актуальный диск
-        return drive_path
-
-    def scan_raw_disk_structure(self, drive):
+    def scan_raw_disk_structure(self, drive, buffer_size=4096):
+        """Сканирование диска на предмет структуры каталогов."""
         structure = {}
         try:
             handle = win32file.CreateFile(
-                drive, win32file.GENERIC_READ, win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
-                None, win32file.OPEN_EXISTING, 0, None
+                drive,
+                win32file.GENERIC_READ,
+                win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
+                None,
+                win32file.OPEN_EXISTING,
+                0,
+                None,
             )
-            buffer_size = 4096
-            current_directory = "idea0"
-            structure[current_directory] = {}
 
             offset = 0
             max_iterations = 10 ** 6
@@ -59,25 +49,28 @@ class DiskScanner:
                     print("Превышено максимальное количество итераций.")
                     break
 
-
                 win32file.SetFilePointer(handle, offset, win32file.FILE_BEGIN)
-                data = win32file.ReadFile(handle, buffer_size)[1]
+                data = win32file.ReadFile(handle, buffer_size)[0]
 
                 if not data or len(data) < buffer_size:
                     break
 
-                date_match = re.search(rb'\d{4}-\d{2}-\d{2}', data)
-                file_match = re.findall(rb'\d{2}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}\[R\]\[\@\d+\]\[\d+\]\.h264', data)
+                # Пример паттернов для поиска:
+                catalog_match = re.search(rb'catalog_name/', data)  # Пример каталога
+                date_match = re.search(rb'\d{2}-\d{2}-\d{4}', data)  # Пример даты
+                file_match = re.findall(rb'\d{2}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}\[R\]\[\@\d+\]\[\d+\]\.h264', data)  # Пример файлов
 
-                if date_match:
+                if catalog_match and date_match:
+                    # Извлекаем дату каталога
                     date_folder = date_match.group().decode('utf-8')
-                    if date_folder not in structure[current_directory]:
-                        structure[current_directory][date_folder] = {}
 
+                    if date_folder not in structure:
+                        structure[date_folder] = []
+
+                    # Добавляем найденные файлы в структуру
                     for file in file_match:
                         file_name = file.decode('utf-8')
-                        structure[current_directory][date_folder][file_name] = "h264"
-
+                        structure[date_folder].append(file_name)
 
                 offset += buffer_size
 
@@ -86,3 +79,13 @@ class DiskScanner:
             print(f"Ошибка при сканировании {drive}: {e}")
 
         return structure
+
+# Пример использования:
+scanner = DiskScanner()
+last_drive = scanner.get_last_physical_drive()
+if last_drive:
+    structure = scanner.scan_raw_disk_structure(last_drive)
+    if structure:
+        print("Структура данных:", structure)
+    else:
+        print("Структура данных не найдена.")
